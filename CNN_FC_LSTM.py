@@ -41,9 +41,9 @@ n_person = 108
 window_size = 10
 n_lstm_layers = 2
 # full connected parameter
-fc_size = 1024
-n_fc_in = 1024
-n_fc_out = 1024
+1st_fc_size = 1024
+hidden_state_size = 1024
+2nd_fc_size = 1024
 
 dropout_prob = 0.5
 
@@ -160,87 +160,111 @@ print("**********("+time.asctime(time.localtime(time.time()))+") Define paramete
 
 print("**********("+time.asctime(time.localtime(time.time()))+") Define NN structure Begin: **********\n")
 
+
+#####################################################################
+# Define the neural network
+#####################################################################
 # input placeholder
+# input X size [batch_size*window_size, height, width, channel]
+# input Y size [batch_size, labels]
 X = tf.placeholder(tf.float32, shape=[None, input_height, input_width, input_channel_num], name='X')
 Y = tf.placeholder(tf.float32, shape=[None, n_labels], name = 'Y')
 keep_prob = tf.placeholder(tf.float32, name = 'keep_prob')
 phase_train = tf.placeholder(tf.bool, name = 'phase_train')
 
+#####################################################################
+# 2D CNN layers
+#####################################################################
+
 # first CNN layer
 conv_1 = apply_conv2d(X, kernel_height_1st, kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride)
-# pool_1 = apply_max_pooling(conv_1, pooling_height, pooling_width, pooling_stride)
 print(conv_1.shape)
+
 # second CNN layer
 conv_2 = apply_conv2d(conv_1, kernel_height_2nd, kernel_width_2nd, conv_channel_num, conv_channel_num*2, kernel_stride)
-# pool_2 = apply_max_pooling(conv_2, pooling_height, pooling_width, pooling_stride)
 print(conv_2.shape)
+
 # third CNN layer
 conv_3 = apply_conv2d(conv_2, kernel_height_3rd, kernel_width_3rd, conv_channel_num*2, conv_channel_num*4, kernel_stride)
-# fully connected layer
 print(conv_3.shape)
+
+# fully connected layer
+
+# get the shape of last CNN layer
+# shape[0] => batch size
+# shape[1] => height
+# shape[2] => width
+# shape[3] => channel
 shape = conv_3.get_shape().as_list()
 
-pool_2_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]*shape[3]])
-fc = apply_fully_connect(pool_2_flat, shape[1]*shape[2]*shape[3], fc_size)
+# flatten the last CNN layer
+conv_3_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]*shape[3]])
+fc_cnn = apply_fully_connect(conv_3_flat, shape[1]*shape[2]*shape[3], 1st_fc_size)
 
-# dropout regularizer
 # Dropout (to reduce overfitting; useful when training very large neural network)
 # We will turn on dropout during training & turn off during testing
 
-fc_drop = tf.nn.dropout(fc, keep_prob)
-
-# fc_drop size [batch_size*window_size, fc_size]
-# lstm_in size [batch_size, window_size, fc_size]
-lstm_in = tf.reshape(fc_drop, [-1, window_size, fc_size])	
+fc_cnn_drop = tf.nn.dropout(fc_cnn, keep_prob)
 
 ###########################################################################################
-# add lstm cell to network
+# RNN layers with lstm cell
 ###########################################################################################
+
+# reshape RNN input to time sequence
+# fc_cnn_drop size 	[batch_size*window_size, 1st_fc_size]
+# lstm_in size 		[batch_size, window_size, 1st_fc_size]
+lstm_in = tf.reshape(fc_cnn_drop, [-1, window_size, 1st_fc_size])	
+
+
 # define lstm cell
 cells = []
 for _ in range(n_lstm_layers):
-	cell = tf.contrib.rnn.BasicLSTMCell(n_fc_in, forget_bias=1.0, state_is_tuple=True)
-# cell = tf.contrib.rnn.LSTMBlockCell(n_fc_in, forget_bias=1.0)
-# cell = tf.contrib.rnn.GRUBlockCell(n_fc_in, forget_bias=1.0, state_is_tuple=True)
-# cell = tf.contrib.rnn.GridLSTMCell(n_fc_in, forget_bias=1.0, state_is_tuple=True)
-# cell = tf.contrib.rnn.GLSTMCell(n_fc_in, forget_bias=1.0, state_is_tuple=True)
-# cell = tf.contrib.rnn.GRUCell(n_fc_in, state_is_tuple=True)
+	cell = tf.contrib.rnn.BasicLSTMCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
+#	cell = tf.contrib.rnn.LSTMBlockCell(hidden_state_size, forget_bias=1.0)
+#	cell = tf.contrib.rnn.GRUBlockCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
+#	cell = tf.contrib.rnn.GridLSTMCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
+#	cell = tf.contrib.rnn.GLSTMCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
+#	cell = tf.contrib.rnn.GRUCell(hidden_state_size, state_is_tuple=True)
 	cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=keep_prob)
 	cells.append(cell)
 lstm_cell = tf.contrib.rnn.MultiRNNCell(cells)
 
 init_state = lstm_cell.zero_state(batch_size, dtype=tf.float32)
 
-# output ==> [batch, step, n_fc_in]
+# If time_major == False (default), this must be a Tensor of shape: [batch_size, max_time, ...]
+# If time_major == True, 			this must be a Tensor of shape: [max_time, batch_size, ...]
 output, states = tf.nn.dynamic_rnn(lstm_cell, lstm_in, initial_state=init_state, time_major=False)
 
-# output ==> [step, batch, n_fc_in]
-# output = tf.transpose(output, [1, 0, 2])
+# output ==> 						  [batch, window_size, hidden_state_size]
+# tf.transpose(output, [1, 0, 2]) ==> [window_size, batch, hidden_state_size]
+# unstack to get a list of 'window_size' tensors of shape [batch_size, hidden_state_size]
+output = tf.unstack(tf.transpose(output, [1, 0, 2]), name = 'lstm_out')
 
 # only need the output of last time step
-# rnn_output ==> [batch, n_fc_in]
-# rnn_output = tf.gather(output, int(output.get_shape()[0])-1)
-# print(type(rnn_output))
-###################################################################
-# another output method
-output = tf.unstack(tf.transpose(output, [1, 0, 2]), name = 'lstm_out')
+# rnn_output ==> [batch, hidden_state_size]
 rnn_output = output[-1]
-###################################################################
 
 ###########################################################################################
 # fully connected and readout
 ###########################################################################################
-# rnn_output ==> [batch, fc_size]
+# get the shape of RNN output
+# rnn_output ==> [batch, hidden_state_size]
 shape_rnn_out = rnn_output.get_shape().as_list()
-# fc_out ==> [batch_size, n_fc_out]
-fc_out = apply_fully_connect(rnn_output, shape_rnn_out[1], n_fc_out)
+# fc_out ==> [batch_size, 2nd_fc_size]
+fc_out = apply_fully_connect(rnn_output, shape_rnn_out[1], 2nd_fc_size)
  
 # keep_prob = tf.placeholder(tf.float32)
-fc_drop = tf.nn.dropout(fc_out, keep_prob)	
+fc_rnn_drop = tf.nn.dropout(fc_out, keep_prob)	
 
 # readout layer
-y_ = apply_readout(fc_drop, shape_rnn_out[1], n_labels)
+y_ = apply_readout(fc_rnn_drop, 2nd_fc_size, n_labels)
+
+###########################################################################################
+# predict output
+###########################################################################################
+# prediction output
 y_pred = tf.argmax(tf.nn.softmax(y_), 1, name = "y_pred")
+# possibility output
 y_posi = tf.nn.softmax(y_, name = "y_posi")
 
 # l2 regularization
@@ -363,7 +387,7 @@ with tf.Session(config=config) as session:
 	# save result
 	os.system("mkdir ./result/"+output_dir+" -p")
 	result 	= pd.DataFrame({'epoch':range(1,epoch+2), "train_accuracy":train_accuracy_save, "test_accuracy":test_accuracy_save,"train_loss":train_loss_save,"test_loss":test_loss_save})
-	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'conv_4':conv_4_shape, 'pool_3':pool_3_shape, 'fc':fc_size,'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob,  'n_person':n_person, "calibration":calibration, 'sliding_window':window_size, "epoch":epoch+1, "norm":norm_type, "learning_rate":learning_rate, "regularization":regularization_method, "train_sample":train_sample, "test_sample":test_sample}, index=[0])
+	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'conv_4':conv_4_shape, 'pool_3':pool_3_shape, 'fc':1st_fc_size,'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob,  'n_person':n_person, "calibration":calibration, 'sliding_window':window_size, "epoch":epoch+1, "norm":norm_type, "learning_rate":learning_rate, "regularization":regularization_method, "train_sample":train_sample, "test_sample":test_sample}, index=[0])
 	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1, 'roc_auc':test_auc})
 
 	writer = pd.ExcelWriter("./result/"+output_dir+"/"+output_file+".xlsx")
