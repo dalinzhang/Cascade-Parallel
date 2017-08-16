@@ -59,7 +59,7 @@ with open(dataset_dir+"top108_shuffle_labels_3D_win_10.pkl", "rb") as fp:
 
 datasets = datasets.reshape(len(datasets), window_size, 10, 11, 1)
 one_hot_labels = np.array(list(pd.get_dummies(labels)))
-print(one_hot_labels)
+print("\n",one_hot_labels)
 labels = np.asarray(pd.get_dummies(labels), dtype = np.int8)
 
 
@@ -145,7 +145,7 @@ def bias_variable(shape):
 
 def conv3d(x, W, kernel_stride):
 # API: must strides[0]=strides[4]=1
-	return tf.nn.conv3d(x, W, strides=[1, kernel_stride, kernel_stride, kernel_stride, 1], padding='VALID')
+	return tf.nn.conv3d(x, W, strides=[1, kernel_stride, kernel_stride, kernel_stride, 1], padding='SAME')
 
 def batch_norm(x, n_out, phase_train):
     """
