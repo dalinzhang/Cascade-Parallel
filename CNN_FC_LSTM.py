@@ -28,9 +28,11 @@ np.random.seed(33)
 conv_1_shape = '3*3*1*32'
 pool_1_shape = 'None'
 
+# conv_2_shape = 'None'
 conv_2_shape = '3*3*1*64'
 pool_2_shape = 'None'
 
+# conv_3_shape = 'None'
 conv_3_shape = '3*3*1*128'
 pool_3_shape = 'None'
 
@@ -39,11 +41,15 @@ pool_4_shape = 'None'
 
 n_person = 108
 window_size = 10
-n_lstm_layers = 2
+n_lstm_layers = 3
+print("rnn layers:", n_lstm_layers)
 # full connected parameter
-1st_fc_size = 1024
-hidden_state_size = 1024
-2nd_fc_size = 1024
+n_fc_in = 1024
+# n_fc_in = 'None'
+n_hidden_state = 64
+print("\n****************size of hidden state", n_hidden_state,"\n")
+# n_fc_out = "None"
+n_fc_out = 1024
 
 dropout_prob = 0.5
 
@@ -52,8 +58,10 @@ norm_type='2D'
 regularization_method = 'dropout'
 enable_penalty = False
 
-output_dir 	= "conv_3l_win_10_108_fc_rnn2_fc_1024_N_summary_075_train_posibility_roc"
-output_file = "conv_3l_win_10_108_fc_rnn2_fc_1024_N_summary_075_train_posibility_roc"
+conv_channel_num = 32
+
+output_dir 	= "conv_3l_win_"+str(window_size)+"_"+str(n_person)+"_fc_"+str(n_fc_in)+"_rnn"+str(n_lstm_layers)+"_fc_"+str(n_fc_out)+"_"+calibration+"_075_train_feature_map_"+str(conv_channel_num)+"_hs_"+str(n_hidden_state)
+output_file = "conv_3l_win_"+str(window_size)+"_"+str(n_person)+"_fc_"+str(n_fc_in)+"_rnn"+str(n_lstm_layers)+"_fc_"+str(n_fc_out)+"_"+calibration+"_075_train_feature_map_"+str(conv_channel_num)+"_hs_"+str(n_hidden_state)
 
 dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/3D_CNN_dataset/raw_data/"
 
@@ -73,13 +81,13 @@ train_x = datasets[split]
 train_y = labels[split]
 
 train_sample = len(train_x)
-print("train sample:", train_sample)
+print("\ntrain sample:", train_sample)
 
 test_x = datasets[~split] 
 test_y = labels[~split]
 
 test_sample = len(test_x)
-print("test sample:", test_sample)
+print("\ntest sample:", test_sample)
 
 print("**********("+time.asctime(time.localtime(time.time()))+") Load and Split dataset End **********\n")
 
@@ -95,7 +103,7 @@ n_labels = 5
 
 # training parameter
 lambda_loss_amount = 0.0005
-training_epochs = 300
+training_epochs = 400
 
 batch_size = 300
 batch_num_per_epoch = train_x.shape[0]//batch_size
@@ -115,7 +123,7 @@ kernel_height_3rd	= 3
 kernel_width_3rd 	= 3
 
 kernel_stride 	= 1
-conv_channel_num = 32
+
 # pooling parameter
 pooling_height 	= 2
 pooling_width 	= 2
@@ -160,111 +168,104 @@ print("**********("+time.asctime(time.localtime(time.time()))+") Define paramete
 
 print("**********("+time.asctime(time.localtime(time.time()))+") Define NN structure Begin: **********\n")
 
-
-#####################################################################
-# Define the neural network
-#####################################################################
 # input placeholder
-# input X size [batch_size*window_size, height, width, channel]
-# input Y size [batch_size, labels]
 X = tf.placeholder(tf.float32, shape=[None, input_height, input_width, input_channel_num], name='X')
 Y = tf.placeholder(tf.float32, shape=[None, n_labels], name = 'Y')
 keep_prob = tf.placeholder(tf.float32, name = 'keep_prob')
 phase_train = tf.placeholder(tf.bool, name = 'phase_train')
 
-#####################################################################
-# 2D CNN layers
-#####################################################################
-
 # first CNN layer
 conv_1 = apply_conv2d(X, kernel_height_1st, kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride)
+# pool_1 = apply_max_pooling(conv_1, pooling_height, pooling_width, pooling_stride)
 print(conv_1.shape)
-
 # second CNN layer
 conv_2 = apply_conv2d(conv_1, kernel_height_2nd, kernel_width_2nd, conv_channel_num, conv_channel_num*2, kernel_stride)
+# pool_2 = apply_max_pooling(conv_2, pooling_height, pooling_width, pooling_stride)
 print(conv_2.shape)
-
 # third CNN layer
 conv_3 = apply_conv2d(conv_2, kernel_height_3rd, kernel_width_3rd, conv_channel_num*2, conv_channel_num*4, kernel_stride)
-print(conv_3.shape)
-
 # fully connected layer
-
-# get the shape of last CNN layer
-# shape[0] => batch size
-# shape[1] => height
-# shape[2] => width
-# shape[3] => channel
+print(conv_3.shape)
 shape = conv_3.get_shape().as_list()
 
-# flatten the last CNN layer
-conv_3_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]*shape[3]])
-fc_cnn = apply_fully_connect(conv_3_flat, shape[1]*shape[2]*shape[3], 1st_fc_size)
+if (n_fc_in == 'None'):
+	print("\nfc_in is None\n")
+	fc = tf.reshape(conv_3, [-1, shape[1]*shape[2]*shape[3]])
+else:
+	conv_3_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]*shape[3]])
+	fc = apply_fully_connect(conv_3_flat, shape[1]*shape[2]*shape[3], n_fc_in)
 
+# dropout regularizer
 # Dropout (to reduce overfitting; useful when training very large neural network)
 # We will turn on dropout during training & turn off during testing
 
-fc_cnn_drop = tf.nn.dropout(fc_cnn, keep_prob)
+fc_drop = tf.nn.dropout(fc, keep_prob)
+
+# fc_drop size [batch_size*window_size, n_fc_in]
+# lstm_in size [batch_size, window_size, n_fc_in]
+if (n_fc_in == 'None'):
+	print("fc_in is None\n")
+	lstm_in = tf.reshape(fc_drop, [-1, window_size, shape[1]*shape[2]*shape[3]])
+else:
+	lstm_in = tf.reshape(fc_drop, [-1, window_size, n_fc_in])
 
 ###########################################################################################
-# RNN layers with lstm cell
+# add lstm cell to network
 ###########################################################################################
-
-# reshape RNN input to time sequence
-# fc_cnn_drop size 	[batch_size*window_size, 1st_fc_size]
-# lstm_in size 		[batch_size, window_size, 1st_fc_size]
-lstm_in = tf.reshape(fc_cnn_drop, [-1, window_size, 1st_fc_size])	
-
-
 # define lstm cell
 cells = []
 for _ in range(n_lstm_layers):
-	cell = tf.contrib.rnn.BasicLSTMCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
-#	cell = tf.contrib.rnn.LSTMBlockCell(hidden_state_size, forget_bias=1.0)
-#	cell = tf.contrib.rnn.GRUBlockCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
-#	cell = tf.contrib.rnn.GridLSTMCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
-#	cell = tf.contrib.rnn.GLSTMCell(hidden_state_size, forget_bias=1.0, state_is_tuple=True)
-#	cell = tf.contrib.rnn.GRUCell(hidden_state_size, state_is_tuple=True)
+	cell = tf.contrib.rnn.BasicLSTMCell(n_hidden_state, forget_bias=1.0, state_is_tuple=True)
+# cell = tf.contrib.rnn.LSTMBlockCell(n_hidden_state, forget_bias=1.0)
+# cell = tf.contrib.rnn.GRUBlockCell(n_hidden_state, forget_bias=1.0, state_is_tuple=True)
+# cell = tf.contrib.rnn.GridLSTMCell(n_hidden_state, forget_bias=1.0, state_is_tuple=True)
+# cell = tf.contrib.rnn.GLSTMCell(n_hidden_state, forget_bias=1.0, state_is_tuple=True)
+# cell = tf.contrib.rnn.GRUCell(n_hidden_state, state_is_tuple=True)
 	cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=keep_prob)
 	cells.append(cell)
 lstm_cell = tf.contrib.rnn.MultiRNNCell(cells)
 
 init_state = lstm_cell.zero_state(batch_size, dtype=tf.float32)
 
-# If time_major == False (default), this must be a Tensor of shape: [batch_size, max_time, ...]
-# If time_major == True, 			this must be a Tensor of shape: [max_time, batch_size, ...]
+# output ==> [batch, step, n_hidden_state]
 output, states = tf.nn.dynamic_rnn(lstm_cell, lstm_in, initial_state=init_state, time_major=False)
 
-# output ==> 						  [batch, window_size, hidden_state_size]
-# tf.transpose(output, [1, 0, 2]) ==> [window_size, batch, hidden_state_size]
-# unstack to get a list of 'window_size' tensors of shape [batch_size, hidden_state_size]
-output = tf.unstack(tf.transpose(output, [1, 0, 2]), name = 'lstm_out')
+# output ==> [step, batch, n_hidden_state]
+# output = tf.transpose(output, [1, 0, 2])
 
 # only need the output of last time step
-# rnn_output ==> [batch, hidden_state_size]
+# rnn_output ==> [batch, n_hidden_state]
+# rnn_output = tf.gather(output, int(output.get_shape()[0])-1)
+# print(type(rnn_output))
+###################################################################
+# another output method
+output = tf.unstack(tf.transpose(output, [1, 0, 2]), name = 'lstm_out')
 rnn_output = output[-1]
+###################################################################
 
 ###########################################################################################
 # fully connected and readout
 ###########################################################################################
-# get the shape of RNN output
-# rnn_output ==> [batch, hidden_state_size]
+# rnn_output ==> [batch, n_hidden_state]
 shape_rnn_out = rnn_output.get_shape().as_list()
-# fc_out ==> [batch_size, 2nd_fc_size]
-fc_out = apply_fully_connect(rnn_output, shape_rnn_out[1], 2nd_fc_size)
+if (n_fc_out == "None"):
+	print("fc_out is None\n")
+	fc_out = rnn_output
+else:
+	# fc_out ==> [batch_size, n_fc_out]
+	fc_out = apply_fully_connect(rnn_output, shape_rnn_out[1], n_fc_out)
  
 # keep_prob = tf.placeholder(tf.float32)
-fc_rnn_drop = tf.nn.dropout(fc_out, keep_prob)	
+fc_drop = tf.nn.dropout(fc_out, keep_prob)	
 
 # readout layer
-y_ = apply_readout(fc_rnn_drop, 2nd_fc_size, n_labels)
+if (n_fc_out == "None"):
+	print("fc_out is None\n")
+	y_ = apply_readout(fc_drop, shape_rnn_out[1], n_labels)
+else:
+	y_ = apply_readout(fc_drop, n_fc_out, n_labels)
 
-###########################################################################################
-# predict output
-###########################################################################################
-# prediction output
 y_pred = tf.argmax(tf.nn.softmax(y_), 1, name = "y_pred")
-# possibility output
 y_posi = tf.nn.softmax(y_, name = "y_posi")
 
 # l2 regularization
@@ -373,24 +374,24 @@ with tf.Session(config=config) as session:
 	# f1 score
 	test_f1 = f1_score(test_true, test_pred_1_hot, average=None)
 	# auc
-	test_auc = roc_auc_score(test_true, test_pred_1_hot, average=None)
+	# test_auc = roc_auc_score(test_true, test_pred_1_hot, average=None)
 	# confusion matrix
 	confusion_matrix = confusion_matrix(test_true_list, test_pred)
 
 	print("********************recall:", test_recall)
 	print("*****************precision:", test_precision)
-	print("******************test_auc:", test_auc)
+	# print("******************test_auc:", test_auc)
 	print("******************f1_score:", test_f1)
 	print("**********confusion_matrix:\n", confusion_matrix)
 
 	print("("+time.asctime(time.localtime(time.time()))+") Final Test Cost: ", np.mean(test_loss), "Final Test Accuracy: ", np.mean(test_accuracy))
 	# save result
-	os.system("mkdir ./result/"+output_dir+" -p")
+	os.system("mkdir ./result/tune_rnn_layer/"+output_dir+" -p")
 	result 	= pd.DataFrame({'epoch':range(1,epoch+2), "train_accuracy":train_accuracy_save, "test_accuracy":test_accuracy_save,"train_loss":train_loss_save,"test_loss":test_loss_save})
-	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'conv_4':conv_4_shape, 'pool_3':pool_3_shape, 'fc':1st_fc_size,'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob,  'n_person':n_person, "calibration":calibration, 'sliding_window':window_size, "epoch":epoch+1, "norm":norm_type, "learning_rate":learning_rate, "regularization":regularization_method, "train_sample":train_sample, "test_sample":test_sample}, index=[0])
-	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1, 'roc_auc':test_auc})
+	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'conv_4':conv_4_shape, 'pool_3':pool_3_shape, 'n_fc_in':n_fc_in, 'n_fc_out':n_fc_out, 'n_hidden_state':n_hidden_state, 'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob,  'n_person':n_person, "calibration":calibration, 'sliding_window':window_size, "epoch":epoch+1, "norm":norm_type, "learning_rate":learning_rate, "regularization":regularization_method, "train_sample":train_sample, "test_sample":test_sample}, index=[0])
+	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1})#, 'roc_auc':test_auc})
 
-	writer = pd.ExcelWriter("./result/"+output_dir+"/"+output_file+".xlsx")
+	writer = pd.ExcelWriter("./result/tune_rnn_layer/"+output_dir+"/"+output_file+".xlsx")
 	ins.to_excel(writer, 'condition', index=False)
 	result.to_excel(writer, 'result', index=False)
 	summary.to_excel(writer, 'summary', index=False)
@@ -406,9 +407,9 @@ with tf.Session(config=config) as session:
 		roc.to_excel(writer, key, index=False)
 		i += 1
 	writer.save()
-	with open("./result/"+output_dir+"/confusion_matrix.pkl", "wb") as fp:
+	with open("./result/tune_rnn_layer/"+output_dir+"/confusion_matrix.pkl", "wb") as fp:
   		pickle.dump(confusion_matrix, fp)
 	# save model
 	saver = tf.train.Saver()
-	saver.save(session, "./result/"+output_dir+"/model_"+output_file)
+	saver.save(session, "./result/tune_rnn_layer/"+output_dir+"/model_"+output_file)
 print("**********("+time.asctime(time.localtime(time.time()))+") Train and Test NN End **********\n")
