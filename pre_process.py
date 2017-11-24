@@ -20,6 +20,9 @@ def get_args():
 	hpstr = "set window size"
 	parser.add_argument('-w', '--window', default=10, nargs='*', type=int, help=hpstr)
 
+	hpstr = "set whether parallel"
+	parser.add_argument('--parallel', action='store_true', help=hpstr)
+
 	hpstr = "set whether convert to 2D matrix"
 	parser.add_argument('--convert', action='store_true', help=hpstr)
 
@@ -46,6 +49,7 @@ def print_top(dataset_dir, window_size, convert, segment, begin_subject, end_sub
 		   \n#### Author: Dalin Zhang	UNSW, Sydney	email: zhangdalin90@gmail.com #####	\
 		   \n# input directory:	%s \
 		   \n# window size:		%d 	\
+		   \n# parallel:	%s 	\
 		   \n# convert:		%s 	\
 		   \n# segment:		%s 	\
 		   \n# begin subject:	%d 	\
@@ -57,6 +61,7 @@ def print_top(dataset_dir, window_size, convert, segment, begin_subject, end_sub
 			window_size,	\
 			convert,		\
 			segment,		\
+			parallel,		\
 			begin_subject,	\
 			end_subject,	\
 			output_dir,		\
