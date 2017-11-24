@@ -20,6 +20,9 @@ def get_args():
 	hpstr = "set window size"
 	parser.add_argument('-w', '--window', default=10, nargs='*', type=int, help=hpstr)
 
+	hpstr = "set whether parallel"
+	parser.add_argument('--parallel', action='store_true', help=hpstr)
+
 	hpstr = "set whether convert to 2D matrix"
 	parser.add_argument('--convert', action='store_true', help=hpstr)
 
@@ -46,6 +49,7 @@ def print_top(dataset_dir, window_size, convert, segment, begin_subject, end_sub
 		   \n#### Author: Dalin Zhang	UNSW, Sydney	email: zhangdalin90@gmail.com #####	\
 		   \n# input directory:	%s \
 		   \n# window size:		%d 	\
+		   \n# parallel:	%s 	\
 		   \n# convert:		%s 	\
 		   \n# segment:		%s 	\
 		   \n# begin subject:	%d 	\
@@ -57,6 +61,7 @@ def print_top(dataset_dir, window_size, convert, segment, begin_subject, end_sub
 			window_size,	\
 			convert,		\
 			segment,		\
+			parallel,		\
 			begin_subject,	\
 			end_subject,	\
 			output_dir,		\
@@ -136,11 +141,14 @@ def segment_signal_without_transition(data, label, window_size):
 				# labels = np.append(labels, stats.mode(label[start:end])[0][0])
 	return segments, labels
 
-def apply_mixup(dataset_dir, convert, segment, window_size, start=1, end=110):
+def apply_mixup(dataset_dir, parallel, convert, segment, window_size, start=1, end=110):
 	# initial empty label arrays
 	label_inter	= np.empty([0])
 	# initial empty data arrays
-	if ((convert == False) and (segment == False)):
+	if (parallel == True):
+		data_inter_cnn	= np.empty([0, window_size, 10, 11])
+		data_inter_rnn	= np.empty([0, window_size, 64])
+	elif ((convert == False) and (segment == False)):
 		data_inter	= np.empty([0, 64])
 	elif ((convert == False) and (segment == True)): 
 		data_inter	= np.empty([0, window_size, 64])
@@ -173,7 +181,15 @@ def apply_mixup(dataset_dir, convert, segment, window_size, start=1, end=110):
 				data_label.drop('labels', axis=1, inplace=True)
 				data		= data_label.as_matrix()
 				data		= norm_dataset(data)
-				if ((convert == False) and (segment == False)):
+				if (parallel == True):
+					# segment data
+					data, label	= segment_signal_without_transition(data, label, window_size)
+					# cnn data process
+					data_cnn	= dataset_1Dto2D(data)
+					data_cnn	= data_cnn.reshape(int(data_cnn.shape[0]/window_size), window_size, 10, 11)
+					# rnn data process
+					data_rnn	= data_cnn.reshape(int(data.shape[0]/window_size), window_size, 64)
+				elif ((convert == False) and (segment == False)):
 					pass
 				elif ((convert == False) and (segment == True)):
 					# segment data with sliding window 
@@ -189,31 +205,46 @@ def apply_mixup(dataset_dir, convert, segment, window_size, start=1, end=110):
 					data, label	= segment_signal_without_transition(data, label, window_size)
 					data		= data.reshape(int(data.shape[0]/window_size), window_size, 10, 11)
 				# append new data and label
-				data_inter	= np.vstack([data_inter, data])
-				label_inter	= np.append(label_inter, label)
+				if (parallel == True):
+					data_inter_cnn	= np.vstack([data_inter_cnn, data_cnn])
+					data_inter_rnn	= np.vstack([data_inter_rnn, data_rnn])
+					label_inter	= np.append(label_inter, label)
+				else:
+					data_inter	= np.vstack([data_inter, data])
+					label_inter	= np.append(label_inter, label)
 			else:
 				pass
 	# shuffle data
 	index = np.array(range(0, len(label_inter)))
 	np.random.shuffle(index)
-	shuffled_data	= data_inter[index]
-	shuffled_label 	= label_inter[index]
+	if (parallel==True):
+		shuffled_data_cnn	= data_inter_cnn[index]
+		shuffled_data_rnn	= data_inter_rnn[index]
+		shuffled_label 	= label_inter[index]
+	else:
+		shuffled_data	= data_inter[index]
+		shuffled_label 	= label_inter[index]
 	return shuffled_data, shuffled_label
 
 if __name__ == '__main__':
 	dataset_dir		=	get_args().directory
 	window_size		=	get_args().window
+	parallel		=	get_args().parallel
 	convert			=	get_args().convert
 	segment			=	get_args().segment
 	begin_subject	=	get_args().begin
 	end_subject		=	get_args().end
 	output_dir		=	get_args().output_dir
 	set_store		=	get_args().set_store
-	print_top(dataset_dir, window_size, convert, segment, begin_subject, end_subject, output_dir, set_store)
+	print_top(dataset_dir, window_size, parallel, convert, segment, begin_subject, end_subject, output_dir, set_store)
 
-	shuffled_data, shuffled_label = apply_mixup(dataset_dir, convert, segment, window_size, begin_subject, end_subject+1)
+	shuffled_data, shuffled_label = apply_mixup(dataset_dir, parallel, convert, segment, window_size, begin_subject, end_subject+1)
 	if (set_store == True):
-		if ((convert == False) and (segment == False)):
+		if (parallel == True):
+			output_data_cnn = output_dir+"parallel_cnn_rnn/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_cnn_dataset.pkl"
+			output_data_rnn = output_dir+"parallel_cnn_rnn/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_rnn_dataset.pkl"
+			output_label= output_dir+"parallel_cnn_rnn/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels.pkl"
+		elif ((convert == False) and (segment == False)):
 			output_data = output_dir+"1D_CNN/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl"
 			output_label= output_dir+"1D_CNN/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels_1D.pkl"
 		elif ((convert == False) and (segment == True)): 
@@ -226,8 +257,15 @@ if __name__ == '__main__':
 			output_data = output_dir+"3D_CNN/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_3D_win_"+str(window_size)+".pkl"
 			output_label= output_dir+"3D_CNN/raw_data/"+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels_3D_win_"+str(window_size)+".pkl"
 
-
-		with open(output_data, "wb") as fp:
-			pickle.dump(shuffled_data, fp, protocol=4) 
-		with open(output_label, "wb") as fp:
-			pickle.dump(shuffled_label, fp)
+		if (parallel ==True):
+			with open(output_data_cnn, "wb") as fp:
+				pickle.dump(shuffled_data_cnn, fp, protocol=4) 
+			with open(output_data_rnn, "wb") as fp:
+				pickle.dump(shuffled_data_rnn, fp, protocol=4) 
+			with open(output_label, "wb") as fp:
+				pickle.dump(shuffled_label, fp)
+		else:
+			with open(output_data, "wb") as fp:
+				pickle.dump(shuffled_data, fp, protocol=4) 
+			with open(output_label, "wb") as fp:
+				pickle.dump(shuffled_label, fp)
