@@ -3,9 +3,12 @@ import os
 import numpy as np
 import pandas as pd
 import pyedflib
-			
+
+##############################################################################
+# process raw edf data to csv format
+##############################################################################
+
 dataset_dir = "/home/dadafly/datasets/EEG_motor_imagery/"
-__main__ = '__main__'
 
 def read_data(file_name):
 	f = pyedflib.EdfReader(file_name)
@@ -38,6 +41,26 @@ def convert_event_csv(dataset_dir):
 				file_name = os.path.split(datafile_list[k])[1].strip()
 				csv_file_name = file_name.rstrip(".edf")+".event.csv"
 				os.system("rdann -r "+file_name+" -f 0 -t 125 -a event -v >"+csv_file_name)
+	return None
+###############################################################################
+# convert all .edf file to .csv file
+###############################################################################
+def convert_edf_csv(dataset_dir):
+	datadir_list=os.listdir(dataset_dir)
+	datadir_list=sorted(datadir_list)
+	for j in range(len(datadir_list)):
+		if(os.path.isdir(dataset_dir+datadir_list[j])):
+			print("***"+datadir_list[j]+"begin:")
+			datadir_name = dataset_dir+datadir_list[j].strip()
+			datafile_list = os.popen("ls "+datadir_name+"/*.edf").readlines()
+			os.chdir(datadir_name)
+			for k in range(len(datafile_list)):
+				file_name = os.path.split(datafile_list[k])[1].strip()
+				print(file_name+" begin:")
+				file_name = os.path.split(datafile_list[k])[1].strip()
+				dataset_1D, label = read_data(datafile_list[k].strip())
+				dataset_1D = pd.DataFrame(dataset_1D, columns=[list(label)])
+				dataset_1D.to_csv(datafile_list[k].rstrip(".edf\n")+'.csv', index=False)
 	return None
 			
 ###################################################################################
@@ -164,6 +187,7 @@ def gen_label(dataset_dir):
 			pass
 	return None
 
-if __main__ == '__main__':
+if __name__ == '__main__':
 	# convert_event_csv(dataset_dir)
 	# gen_label(dataset_dir)
+	convert_edf_csv(dataset_dir)
