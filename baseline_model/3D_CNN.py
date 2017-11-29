@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 ###########################################################################
-# implement 1D cnn for EEG decode
+# implement 2D cnn for EEG decode
 ###########################################################################
 from cnn_class import cnn
 import sklearn
@@ -24,27 +24,36 @@ np.random.seed(33)
 # set model parameters
 ###########################################################################
 # kernel parameter
+kernel_depth_1st	= 3
+kernel_height_1st	= 3
 kernel_width_1st 	= 3
 
+kernel_depth_2nd	= 3
+kernel_height_2nd	= 3
 kernel_width_2nd 	= 3
 
+kernel_depth_3rd	= 3
+kernel_height_3rd	= 3
 kernel_width_3rd 	= 3
 
-kernel_stride 		= 1
+kernel_stride		= 1
 
-conv_channel_num 	= 32
+conv_channel_num	= 32
 # pooling parameter
-pooling_height 	= 1
+pooling_depth_1st 	= "None"
+pooling_height_1st 	= "None"
+pooling_width_1st 	= "None"
 
-pooling_width_1st	= "None"
-
+pooling_depth_2nd 	= "None"
+pooling_height_2nd 	= "None"
 pooling_width_2nd	= "None"
 
-pooling_width_3rd	= "None"
+pooling_depth_3rd 	= "None"
+pooling_height_3rd 	= "None"
+pooling_width_3rd 	= "None"
 
-pooling_stride 	= "None"
-
-# fully connected layer size
+pooling_stride = "None"
+# full connected parameter
 fc_size = 1024
 
 ###########################################################################
@@ -54,7 +63,7 @@ fc_size = 1024
 learning_rate = 1e-4
 
 # set maximum traing epochs
-training_epochs = 200
+training_epochs = 500
 
 # set batch size
 batch_size = 100
@@ -63,7 +72,7 @@ batch_size = 100
 dropout_prob = 0.5
 
 # set whether use L2 regularization
-enable_penalty = False
+enable_penalty = True
 
 # set L2 penalty
 lambda_loss_amount = 0.0005
@@ -74,8 +83,17 @@ lambda_loss_amount = 0.0005
 # input channel
 input_channel_num = 1
 
+# window size
+window_size = 10
+
+# input depth
+input_depth = window_size
+
+# input height 
+input_height = 10
+
 # input width
-input_width = 64
+input_width = 11
 
 # prediction class
 num_labels = 5
@@ -90,24 +108,23 @@ begin_subject = 1
 end_subject = 108
 
 # dataset directory
-dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/1D_CNN_dataset/raw_data/"
+dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/2D_CNN_dataset/raw_data/"
 
 # load dataset and label
-with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl", "rb") as fp:
+with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_3D_win_10.pkl", "rb") as fp:
   	datasets = pickle.load(fp)
-with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl", "rb") as fp:
+with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels_3D_win_10.pkl", "rb") as fp:
   	labels = pickle.load(fp)
 
 # reshape dataset
-datasets = datasets.reshape(len(datasets), 64, 1)
+datasets = datasets.reshape(len(datasets), window_size, 10, 11, 1)
 
 # set label to one hot
 labels = np.asarray(pd.get_dummies(labels), dtype = np.int8)
 
-# train test split
-split = np.random.rand(len(datasets)) < train_test_split 
+split = np.random.rand(len(datasets)) < train_test_split
 
-train_x = datasets[split]
+train_x = datasets[split] 
 train_y = labels[split]
 
 test_x = datasets[~split] 
@@ -117,7 +134,7 @@ test_y = labels[~split]
 batch_num_per_epoch = train_x.shape[0]//batch_size
 
 # set test batch number per epoch
-accuracy_batch_size = 50000
+accuracy_batch_size = 300
 train_accuracy_batch_num = train_x.shape[0]//accuracy_batch_size
 test_accuracy_batch_num = test_x.shape[0]//accuracy_batch_size
 
@@ -128,15 +145,16 @@ print(one_hot_labels)
 ###########################################################################
 # for output record
 ###########################################################################
+
 # shape of cnn layer
-conv_1_shape = str(kernel_width_1st)+"*"+str(kernel_stride)+"*"+str(conv_channel_num)
-pool_1_shape = str(pooling_width_1st)+"*"+str(pooling_stride)+"*"+str(conv_channel_num)
+conv_1_shape = str(kernel_depth_1st)+"*"+str(kernel_height_1st)+"*"+str(kernel_width_1st)+"*"+str(kernel_stride)+"*"+str(conv_channel_num)
+pool_1_shape = str(pooling_height_1st)+"*"+str(pooling_width_1st)+"*"+str(pooling_stride)+"*"+str(conv_channel_num)
 
-conv_2_shape = str(kernel_width_2nd)+"*"+str(kernel_stride)+"*"+str(conv_channel_num*2)
-pool_2_shape = str(pooling_width_2nd)+"*"+str(pooling_stride)+"*"+str(conv_channel_num*2)
+conv_2_shape = str(kernel_depth_2nd)+"*"+str(kernel_height_2nd)+"*"+str(kernel_width_2nd)+"*"+str(kernel_stride)+"*"+str(conv_channel_num*2)
+pool_2_shape = str(pooling_depth_2nd)+"*"+str(pooling_height_2nd)+"*"+str(pooling_width_2nd)+"*"+str(pooling_stride)+"*"+str(conv_channel_num*2)
 
-conv_3_shape = str(kernel_width_3rd)+"*"+str(kernel_stride)+"*"+str(conv_channel_num*4)
-pool_3_shape = str(pooling_width_3rd)+"*"+str(pooling_stride)+"*"+str(conv_channel_num*4)
+conv_3_shape = str(kernel_depth_3rd)+"*"+str(kernel_height_3rd)+"*"+str(kernel_width_3rd)+"*"+str(kernel_stride)+"*"+str(conv_channel_num*4)
+pool_3_shape = str(pooling_depth_3rd)+"*"+str(pooling_height_3rd)+"*"+str(pooling_width_3rd)+"*"+str(pooling_stride)+"*"+str(conv_channel_num*4)
 
 # regularization method
 if enable_penalty:
@@ -153,38 +171,39 @@ output_file = "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_me
 ###########################################################################
 
 # instance cnn class
-cnn_1d = cnn()
+cnn_3d = cnn()
 
 # input placeholder
-X = tf.placeholder(tf.float32, shape=[None, input_width, input_channel_num], name = 'X')
+X = tf.placeholder(tf.float32, shape=[None, input_depth, input_height, input_width, input_channel_num], name = 'X')
 Y = tf.placeholder(tf.float32, shape=[None, num_labels], name = 'Y')
 keep_prob = tf.placeholder(tf.float32, name='keep_prob')
 
 # first CNN layer
-conv_1 = cnn_1d.apply_conv1d(X, kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride)
-# pool_1 = cnn_1d.apply_max_pooling(conv_1, pooling_height, pooling_width_1st, pooling_stride)
+conv_1 = cnn_3d.apply_conv3d(X, kernel_depth_1st, kernel_height_1st, kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride)
+# pool_1 = cnn_3d.apply_max_pooling3d(conv_1, pooling_depth, pooling_height, pooling_width, pooling_stride)
 
 # second CNN layer
-conv_2 = cnn_1d.apply_conv1d(conv_1, kernel_width_2nd, conv_channel_num, conv_channel_num*2, kernel_stride)
-# pool_2 = apply_max_pooling(conv_2, pooling_height, pooling_width_2nd, pooling_stride)
+conv_2 = cnn_3d.apply_conv3d(conv_1, kernel_depth_2nd, kernel_height_2nd, kernel_width_2nd, conv_channel_num, conv_channel_num*2, kernel_stride)
+# pool_2 = cnn_3d.apply_max_pooling3d(conv_2, pooling_depth, pooling_height, pooling_width, pooling_stride)
 
 # third CNN layer
-conv_3 = cnn_1d.apply_conv1d(conv_2, kernel_width_3rd, conv_channel_num*2, conv_channel_num*4, kernel_stride)
-# pool_3 = apply_max_pooling(conv_3, pooling_height, pooling_width_3rd, pooling_stride)
+conv_3 = cnn_3d.apply_conv3d(conv_2, kernel_depth_3rd, kernel_height_3rd, kernel_width_3rd, conv_channel_num*2, conv_channel_num*4, kernel_stride)
+# pool_3 = cnn_3d.apply_max_pooling3d(conv_3, pooling_depth, pooling_height, pooling_width, pooling_stride)
+
 
 # flattern the last layer of cnn
 shape = conv_3.get_shape().as_list()
-pool_2_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]])
+conv_3_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]*shape[3]])
 
 # fully connected layer
-fc = cnn_1d.apply_fully_connect(pool_2_flat, shape[1]*shape[2], fc_size,)
+fc = cnn_3d.apply_fully_connect(conv_3_flat, shape[1]*shape[2]*shape[3]*shape[4], fc_size)
 
-# Dropout (to reduce overfitting; useful when training very large neural network)
+## Dropout (to reduce overfitting; useful when training very large neural network)
 # We will turn on dropout during training & turn off during testing
 fc_drop = tf.nn.dropout(fc, keep_prob)	
 
 # readout layer
-y_ = cnn_1d.apply_readout(fc_drop, fc_size, num_labels)
+y_ = apply_readout(fc_drop, fc_size, num_labels)
 
 # probability prediction 
 y_posi = tf.nn.softmax(y_, name = "y_posi")
@@ -232,7 +251,7 @@ with tf.Session(config=config) as session:
 		# training process
 		for b in range(batch_num_per_epoch):
 			offset = (b * batch_size) % (train_y.shape[0] - batch_size) 
-			batch_x = train_x[offset:(offset + batch_size), :, :]
+			batch_x = train_x[offset:(offset + batch_size), :, :, :, :]
 			batch_y = train_y[offset:(offset + batch_size), :]
 			_, c = session.run([optimizer, cost], feed_dict={X: batch_x, Y: batch_y, keep_prob: 1-dropout_prob})
 			cost_history = np.append(cost_history, c)
@@ -242,10 +261,9 @@ with tf.Session(config=config) as session:
 			test_accuracy	= np.zeros(shape=[0], dtype=float)
 			test_loss 		= np.zeros(shape=[0], dtype=float)
 			train_loss 		= np.zeros(shape=[0], dtype=float)
-			# calculate train accuracy after each training epoch
 			for i in range(train_accuracy_batch_num):
 				offset = (i * accuracy_batch_size) % (train_y.shape[0] - accuracy_batch_size) 
-				train_batch_x = train_x[offset:(offset + accuracy_batch_size), :, :]
+				train_batch_x = train_x[offset:(offset + accuracy_batch_size), :, :, :, :]
 				train_batch_y = train_y[offset:(offset + accuracy_batch_size), :]
 				
 				train_a, train_c = session.run([accuracy, cost], feed_dict={X: train_batch_x, Y: train_batch_y, keep_prob: 1.0})
@@ -258,7 +276,7 @@ with tf.Session(config=config) as session:
 			# calculate test accuracy after each training epoch
 			for j in range(test_accuracy_batch_num):
 				offset = (j * accuracy_batch_size) % (test_y.shape[0] - accuracy_batch_size) 
-				test_batch_x = test_x[offset:(offset + accuracy_batch_size), :, :]
+				test_batch_x = test_x[offset:(offset + accuracy_batch_size), :, :, :, :]
 				test_batch_y = test_y[offset:(offset + accuracy_batch_size), :]
 				
 				test_a, test_c = session.run([accuracy, cost], feed_dict={X: test_batch_x, Y: test_batch_y, keep_prob: 1.0})
@@ -279,7 +297,7 @@ with tf.Session(config=config) as session:
 	test_posi		= np.zeros(shape=[0, 5], dtype=float)
 	for k in range(test_accuracy_batch_num):
 		offset = (k * accuracy_batch_size) % (test_y.shape[0] - accuracy_batch_size) 
-		test_batch_x = test_x[offset:(offset + accuracy_batch_size), :, :]
+		test_batch_x = test_x[offset:(offset + accuracy_batch_size), :, :, :, :]
 		test_batch_y = test_y[offset:(offset + accuracy_batch_size), :]
 		
 		test_a, test_c, test_p, test_r = session.run([accuracy, cost, y_pred, y_posi], feed_dict={X: test_batch_x, Y: test_batch_y, keep_prob: 1.0})
@@ -301,21 +319,16 @@ with tf.Session(config=config) as session:
 	test_f1 = f1_score(test_true, test_pred_1_hot, average=None)
 	# confusion matrix
 	confusion_matrix = confusion_matrix(test_true_list, test_pred)
-	
+
 	with open("./result/"+output_dir+"/confusion_matrix.pkl", "wb") as fp:
   		pickle.dump(confusion_matrix, fp)
-
-	print("********************recall:", test_recall)
-	print("*****************precision:", test_precision)
-	print("******************f1_score:", test_f1)
-	print("**********confusion_matrix:\n", confusion_matrix)
 
 	print("("+time.asctime(time.localtime(time.time()))+") Final Test Cost: ", np.mean(test_loss), "Final Test Accuracy: ", np.mean(test_accuracy))
 	# save result
 	os.system("mkdir ./result/"+output_dir+" -p")
 	result 	= pd.DataFrame({'epoch':range(1,epoch+2), "train_accuracy":train_accuracy_save, "test_accuracy":test_accuracy_save,"train_loss":train_loss_save,"test_loss":test_loss_save})
-	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'fc':fc_size, 'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'start_subject':start_subject, 'end_subject':end_subject, "epoch":epoch+1, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
-	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1})
+	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'conv_4':conv_4_shape, 'pool_3':pool_3_shape, 'fc':fc_size,'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'n_person':n_person, "calibration":calibration, 'sliding_window':window_size, "epoch":epoch+1, "norm":norm_type, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
+	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1, 'roc_auc':test_auc})
 
 	writer = pd.ExcelWriter("./result/"+output_dir+"/"+output_file+".xlsx")
 	# save model implementation paralmeters
@@ -324,7 +337,7 @@ with tf.Session(config=config) as session:
 	result.to_excel(writer, 'result', index=False)
 	# save recall/precision/f1 for each class
 	summary.to_excel(writer, 'summary', index=False)
-	# save fpr, tpr, auc for each class
+	# fpr, tpr, auc
 	fpr = dict()
 	tpr = dict()
 	roc_auc = dict()
@@ -341,6 +354,28 @@ with tf.Session(config=config) as session:
 	saver = tf.train.Saver()
 	saver.save(session, "./result/"+output_dir+"/model_"+output_file)
 print("**********("+time.asctime(time.localtime(time.time()))+") Train and Test NN End **********\n")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
