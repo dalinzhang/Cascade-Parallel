@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 ###########################################################################
-# implement 2D cnn for EEG decode
+# implement 3D cnn for EEG decode
 ###########################################################################
 from cnn_class import cnn
 import sklearn
