@@ -92,6 +92,7 @@ end_subject = 108
 # dataset directory
 dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/1D_CNN_dataset/raw_data/"
 
+
 # load dataset and label
 with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl", "rb") as fp:
   	datasets = pickle.load(fp)
@@ -145,10 +146,11 @@ else:
 	regularization_method = 'dropout'
 
 # result output
-output_dir 	= "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
-output_file = "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
+result_dir = "/home/dadafly/experiment_result/eeg_physiobank_cnn_result"
+output_dir 	= "1d_conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
+output_file = "1d_conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
 
-os.system("mkdir ./result/"+output_dir+" -p")
+os.system("mkdir "+result_dir+"/"+output_dir+" -p")
 ###########################################################################
 # build network
 ###########################################################################
@@ -303,7 +305,7 @@ with tf.Session(config=config) as session:
 	# confusion matrix
 	confusion_matrix = confusion_matrix(test_true_list, test_pred)
 	
-	with open("./result/"+output_dir+"/confusion_matrix.pkl", "wb") as fp:
+	with open(result_dir+"/"+output_dir+"/confusion_matrix.pkl", "wb") as fp:
   		pickle.dump(confusion_matrix, fp)
 
 	print("("+time.asctime(time.localtime(time.time()))+") Final Test Cost: ", np.mean(test_loss), "Final Test Accuracy: ", np.mean(test_accuracy))
@@ -312,7 +314,7 @@ with tf.Session(config=config) as session:
 	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'fc':fc_size, 'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'begin_subject':begin_subject, 'end_subject':end_subject, "epoch":epoch+1, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
 	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1})
 
-	writer = pd.ExcelWriter("./result/"+output_dir+"/"+output_file+".xlsx")
+	writer = pd.ExcelWriter(result_dir+"/"+output_dir+"/"+output_file+".xlsx")
 	# save model implementation paralmeters
 	ins.to_excel(writer, 'condition', index=False)
 	# save train/test accuracy and loss for each epoch
@@ -334,7 +336,7 @@ with tf.Session(config=config) as session:
 
 	# save model
 	saver = tf.train.Saver()
-	saver.save(session, "./result/"+output_dir+"/model_"+output_file)
+	saver.save(session, result_dir+"/"+output_dir+"/model_"+output_file)
 print("**********("+time.asctime(time.localtime(time.time()))+") Train and Test NN End **********\n")
 
 
