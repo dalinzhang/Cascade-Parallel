@@ -83,7 +83,7 @@ num_labels = 5
 # train test split
 train_test_split = 0.75
 
-# id of start subject
+# id of begin subject
 begin_subject = 1
 
 # id of end subject
@@ -95,7 +95,7 @@ dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/1D_CNN_dataset/raw_da
 # load dataset and label
 with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl", "rb") as fp:
   	datasets = pickle.load(fp)
-with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl", "rb") as fp:
+with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels_1D.pkl", "rb") as fp:
   	labels = pickle.load(fp)
 
 # reshape dataset
@@ -148,6 +148,7 @@ else:
 output_dir 	= "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
 output_file = "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
 
+os.system("mkdir ./result/"+output_dir+" -p")
 ###########################################################################
 # build network
 ###########################################################################
@@ -174,10 +175,10 @@ conv_3 = cnn_1d.apply_conv1d(conv_2, kernel_width_3rd, conv_channel_num*2, conv_
 
 # flattern the last layer of cnn
 shape = conv_3.get_shape().as_list()
-pool_2_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]])
+conv_3_flat = tf.reshape(conv_3, [-1, shape[1]*shape[2]])
 
 # fully connected layer
-fc = cnn_1d.apply_fully_connect(pool_2_flat, shape[1]*shape[2], fc_size,)
+fc = cnn_1d.apply_fully_connect(conv_3_flat, shape[1]*shape[2], fc_size,)
 
 # Dropout (to reduce overfitting; useful when training very large neural network)
 # We will turn on dropout during training & turn off during testing
@@ -305,16 +306,10 @@ with tf.Session(config=config) as session:
 	with open("./result/"+output_dir+"/confusion_matrix.pkl", "wb") as fp:
   		pickle.dump(confusion_matrix, fp)
 
-	print("********************recall:", test_recall)
-	print("*****************precision:", test_precision)
-	print("******************f1_score:", test_f1)
-	print("**********confusion_matrix:\n", confusion_matrix)
-
 	print("("+time.asctime(time.localtime(time.time()))+") Final Test Cost: ", np.mean(test_loss), "Final Test Accuracy: ", np.mean(test_accuracy))
 	# save result
-	os.system("mkdir ./result/"+output_dir+" -p")
 	result 	= pd.DataFrame({'epoch':range(1,epoch+2), "train_accuracy":train_accuracy_save, "test_accuracy":test_accuracy_save,"train_loss":train_loss_save,"test_loss":test_loss_save})
-	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'fc':fc_size, 'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'start_subject':start_subject, 'end_subject':end_subject, "epoch":epoch+1, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
+	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'fc':fc_size, 'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'begin_subject':begin_subject, 'end_subject':end_subject, "epoch":epoch+1, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
 	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1})
 
 	writer = pd.ExcelWriter("./result/"+output_dir+"/"+output_file+".xlsx")

@@ -39,6 +39,7 @@ kernel_width_3rd 	= 3
 kernel_stride		= 1
 
 conv_channel_num	= 32
+
 # pooling parameter
 pooling_depth_1st 	= "None"
 pooling_height_1st 	= "None"
@@ -52,9 +53,10 @@ pooling_depth_3rd 	= "None"
 pooling_height_3rd 	= "None"
 pooling_width_3rd 	= "None"
 
-pooling_stride = "None"
+pooling_stride		= "None"
+
 # full connected parameter
-fc_size = 1024
+fc_size 			= 1024
 
 ###########################################################################
 # set training parameters
@@ -101,7 +103,7 @@ num_labels = 5
 # train test split
 train_test_split = 0.75
 
-# id of start subject
+# id of begin subject
 begin_subject = 1
 
 # id of end subject
@@ -110,10 +112,11 @@ end_subject = 108
 # dataset directory
 dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/2D_CNN_dataset/raw_data/"
 
+
 # load dataset and label
-with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_3D_win_10.pkl", "rb") as fp:
+with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_3D_win_"+str(window_size)+".pkl", "rb") as fp:
   	datasets = pickle.load(fp)
-with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels_3D_win_10.pkl", "rb") as fp:
+with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_labels_3D_win_"+str(window_size)+".pkl", "rb") as fp:
   	labels = pickle.load(fp)
 
 # reshape dataset
@@ -163,9 +166,10 @@ else:
 	regularization_method = 'dropout'
 
 # result output
-output_dir 	= "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
-output_file = "conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
+output_dir 	= "conv_3l_"+str(begin_subject)+"_"+str(end_subject)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
+output_file = "conv_3l_"+str(begin_subject)+"_"+str(end_subject)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
 
+os.system("mkdir ./result/"+output_dir+" -p")
 ###########################################################################
 # build network
 ###########################################################################
@@ -325,9 +329,8 @@ with tf.Session(config=config) as session:
 
 	print("("+time.asctime(time.localtime(time.time()))+") Final Test Cost: ", np.mean(test_loss), "Final Test Accuracy: ", np.mean(test_accuracy))
 	# save result
-	os.system("mkdir ./result/"+output_dir+" -p")
 	result 	= pd.DataFrame({'epoch':range(1,epoch+2), "train_accuracy":train_accuracy_save, "test_accuracy":test_accuracy_save,"train_loss":train_loss_save,"test_loss":test_loss_save})
-	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, 'conv_4':conv_4_shape, 'pool_3':pool_3_shape, 'fc':fc_size,'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'n_person':n_person, "calibration":calibration, 'sliding_window':window_size, "epoch":epoch+1, "norm":norm_type, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
+	ins 	= pd.DataFrame({'conv_1':conv_1_shape, 'pool_1':pool_1_shape, 'conv_2':conv_2_shape, 'pool_2':pool_2_shape, 'conv_3':conv_3_shape, 'pool_3':pool_3_shape, "begin_subject":begin_subject, "end_subject":end_subject, 'fc':fc_size,'accuracy':np.mean(test_accuracy), 'keep_prob': 1-dropout_prob, 'sliding_window':window_size, "epoch":epoch+1, "learning_rate":learning_rate, "regularization":regularization_method}, index=[0])
 	summary = pd.DataFrame({'class':one_hot_labels, 'recall':test_recall, 'precision':test_precision, 'f1_score':test_f1, 'roc_auc':test_auc})
 
 	writer = pd.ExcelWriter("./result/"+output_dir+"/"+output_file+".xlsx")
