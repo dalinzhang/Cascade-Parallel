@@ -464,11 +464,11 @@ with tf.Session(config=config) as session:
 			for j in range(batch_num_per_epoch):
 				offset = (j * batch_size) % (test_y.shape[0] - batch_size) 
 				if (cnn_dimension == 1):
-					test_batch_x = train_x[offset:(offset + batch_size), :, :]
+					test_batch_x = test_x[offset:(offset + batch_size), :, :]
 				elif(cnn_dimension == 2):
-					test_batch_x = train_x[offset:(offset + batch_size), :, :, :]
+					test_batch_x = test_x[offset:(offset + batch_size), :, :, :]
 				elif(cnn_dimension == 3):
-					test_batch_x = train_x[offset:(offset + batch_size), :, :, :, :]
+					test_batch_x = test_x[offset:(offset + batch_size), :, :, :, :]
 				test_batch_y = test_y[offset:(offset + batch_size), :]
 				
 				test_a, test_c = session.run([accuracy, cost], feed_dict={X: test_batch_x, Y: test_batch_y, keep_prob: 1.0})
@@ -490,11 +490,11 @@ with tf.Session(config=config) as session:
 	for k in range(batch_num_per_epoch):
 		offset = (k * batch_size) % (test_y.shape[0] - batch_size) 
 		if (cnn_dimension == 1):
-			test_batch_x = train_x[offset:(offset + batch_size), :, :]
+			test_batch_x = test_x[offset:(offset + batch_size), :, :]
 		elif(cnn_dimension == 2):
-			test_batch_x = train_x[offset:(offset + batch_size), :, :, :]
+			test_batch_x = test_x[offset:(offset + batch_size), :, :, :]
 		elif(cnn_dimension == 3):
-			test_batch_x = train_x[offset:(offset + batch_size), :, :, :, :]
+			test_batch_x = test_x[offset:(offset + batch_size), :, :, :, :]
 		test_batch_y = test_y[offset:(offset + batch_size), :]
 		
 		test_a, test_c, test_p, test_r = session.run([accuracy, cost, y_pred, y_posi], feed_dict={X: test_batch_x, Y: test_batch_y, keep_prob: 1.0})
