@@ -58,26 +58,6 @@ pooling_stride		= "None"
 # full connected parameter
 fc_size 			= 1024
 
-###########################################################################
-# set training parameters
-###########################################################################
-# set learning rate
-learning_rate = 1e-4
-
-# set maximum traing epochs
-training_epochs = 500
-
-# set batch size
-batch_size = 100
-
-# set dropout probability
-dropout_prob = 0.5
-
-# set whether use L2 regularization
-enable_penalty = True
-
-# set L2 penalty
-lambda_loss_amount = 0.0005
 
 ###########################################################################
 # set dataset parameters
@@ -112,7 +92,6 @@ end_subject = 108
 # dataset directory
 dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/2D_CNN_dataset/raw_data/"
 
-
 # load dataset and label
 with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_3D_win_"+str(window_size)+".pkl", "rb") as fp:
   	datasets = pickle.load(fp)
@@ -133,6 +112,31 @@ train_y = labels[split]
 test_x = datasets[~split] 
 test_y = labels[~split]
 
+# print label
+one_hot_labels = np.array(list(pd.get_dummies(labels)))
+print(one_hot_labels)
+
+###########################################################################
+# set training parameters
+###########################################################################
+# set learning rate
+learning_rate = 1e-4
+
+# set maximum traing epochs
+training_epochs = 500
+
+# set batch size
+batch_size = 100
+
+# set dropout probability
+dropout_prob = 0.5
+
+# set whether use L2 regularization
+enable_penalty = True
+
+# set L2 penalty
+lambda_loss_amount = 0.0005
+
 # set train batch number per epoch
 batch_num_per_epoch = train_x.shape[0]//batch_size
 
@@ -140,10 +144,6 @@ batch_num_per_epoch = train_x.shape[0]//batch_size
 accuracy_batch_size = 300
 train_accuracy_batch_num = train_x.shape[0]//accuracy_batch_size
 test_accuracy_batch_num = test_x.shape[0]//accuracy_batch_size
-
-# print label
-one_hot_labels = np.array(list(pd.get_dummies(labels)))
-print(one_hot_labels)
 
 ###########################################################################
 # for output record

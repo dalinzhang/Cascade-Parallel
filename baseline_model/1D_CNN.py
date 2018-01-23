@@ -48,27 +48,6 @@ pooling_stride 	= "None"
 fc_size = 1024
 
 ###########################################################################
-# set training parameters
-###########################################################################
-# set learning rate
-learning_rate = 1e-4
-
-# set maximum traing epochs
-training_epochs = 200
-
-# set batch size
-batch_size = 100
-
-# set dropout probability
-dropout_prob = 0.5
-
-# set whether use L2 regularization
-enable_penalty = False
-
-# set L2 penalty
-lambda_loss_amount = 0.0005
-
-###########################################################################
 # set dataset parameters
 ###########################################################################
 # input channel
@@ -92,7 +71,6 @@ end_subject = 108
 # dataset directory
 dataset_dir = "/home/dalinzhang/datasets/EEG_motor_imagery/1D_CNN_dataset/raw_data/"
 
-
 # load dataset and label
 with open(dataset_dir+str(begin_subject)+"_"+str(end_subject)+"_shuffle_dataset_1D.pkl", "rb") as fp:
   	datasets = pickle.load(fp)
@@ -114,17 +92,38 @@ train_y = labels[split]
 test_x = datasets[~split] 
 test_y = labels[~split]
 
+# print label
+one_hot_labels = np.array(list(pd.get_dummies(labels)))
+print(one_hot_labels)
+
+###########################################################################
+# set training parameters
+###########################################################################
+# set learning rate
+learning_rate = 1e-4
+
+# set maximum traing epochs
+training_epochs = 200
+
+# set batch size
+batch_size = 100
+
+# set dropout probability
+dropout_prob = 0.5
+
+# set whether use L2 regularization
+enable_penalty = False
+
+# set L2 penalty
+lambda_loss_amount = 0.0005
+
 # set train batch number per epoch
 batch_num_per_epoch = train_x.shape[0]//batch_size
 
 # set test batch number per epoch
-accuracy_batch_size = 50000
+accuracy_batch_size = 500
 train_accuracy_batch_num = train_x.shape[0]//accuracy_batch_size
 test_accuracy_batch_num = test_x.shape[0]//accuracy_batch_size
-
-# print label
-one_hot_labels = np.array(list(pd.get_dummies(labels)))
-print(one_hot_labels)
 
 ###########################################################################
 # for output record
@@ -147,8 +146,8 @@ else:
 
 # result output
 result_dir = "/home/dadafly/experiment_result/eeg_physiobank_cnn_result"
-output_dir 	= "1d_conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
-output_file = "1d_conv_3l_"+str(n_person)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
+output_dir 	= "1d_conv_3l_"+str(begin_subjec)+"_"+str(end_subject)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
+output_file = "1d_conv_3l_"+str(begin_subjec)+"_"+str(end_subject)+"_fc_"+str(fc_size)+"_"+regularization_method+"_"+str(format(train_test_split*100, '03d'))
 
 os.system("mkdir "+result_dir+"/"+output_dir+" -p")
 ###########################################################################
